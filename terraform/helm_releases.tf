@@ -45,6 +45,12 @@ resource "helm_release" "ingress_nginx" {
 
   set {
     name  = "controller.service.type"
-    value = "NodePort" # O ClusterIP según cómo expongas los puertos hacia tu red local
+    value = "NodePort"
+  }
+
+  # Esto le permite al controlador leer Ingresses creados en CUALQUIER namespace (ej. observability)
+  set {
+    name  = "controller.scope.enabled"
+    value = "true"
   }
 }
