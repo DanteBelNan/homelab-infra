@@ -101,6 +101,22 @@ else
     log "Nginx ya está instalado ($(nginx -v 2>&1)). Omitiendo."
 fi
 
+log "7. Verificando k9s (CLI Dashboard para Kubernetes)..."
+if ! command -v k9s &> /dev/null; then
+    log "Instalando k9s..."
+    # Descargar la última versión del binario para Linux amd64
+    curl -sL https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz -o /tmp/k9s.tar.gz
+    
+    # Descomprimir y mover al PATH del sistema
+    tar -zxvf /tmp/k9s.tar.gz -C /tmp k9s
+    sudo mv /tmp/k9s /usr/local/bin/
+    
+    # Limpiar archivo temporal
+    rm -f /tmp/k9s.tar.gz
+else
+    log "k9s ya está instalado ($(k9s version --short 2>/dev/null || echo "installed")). Omitiendo."
+fi
+
 log "=================================================="
 log "Bootstrap finalizado con éxito."
 warn "IMPORTANTE: Si es la primera vez que se añade tu usuario a 'docker', ejecutá 'newgrp docker' o reiniciá sesión."
