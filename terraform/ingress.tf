@@ -2,12 +2,11 @@ resource "kubernetes_ingress_v1" "grafana_ingress" {
   metadata {
     name      = "grafana-ingress"
     namespace = "observability"
-    annotations = {
-      "kubernetes.io/ingress.class" = "nginx"
-    }
   }
 
   spec {
+    ingress_class_name = "nginx"
+
     rule {
       host = "grafana.homelab"
       http {
