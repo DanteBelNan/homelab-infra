@@ -62,6 +62,7 @@ fi
 log "4. Verificando HashiCorp Terraform..."
 if ! command -v terraform &> /dev/null; then
     log "Instalando Terraform..."
+    sudo rm -f /usr/share/keyrings/hashicorp-archive-keyring.gpg
     wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
     
     UBUNTU_CODENAME=$(lsb_release -cs)
