@@ -34,3 +34,17 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "false"
   }
 }
+
+# 3. Despliegue del Nginx Ingress Controller en el namespace infra-core (o uno dedicado como ingress-nginx)
+resource "helm_release" "ingress_nginx" {
+  name             = "ingress-nginx"
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  chart            = "ingress-nginx"
+  namespace        = "infra-core"
+  create_namespace = false
+
+  set {
+    name  = "controller.service.type"
+    value = "NodePort" # O ClusterIP según cómo expongas los puertos hacia tu red local
+  }
+}
