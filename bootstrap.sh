@@ -64,7 +64,6 @@ if ! command -v terraform &> /dev/null; then
     log "Instalando Terraform..."
     wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
     
-    # Forma explícita y robusta para evitar errores de malformed entry con lsb_release
     UBUNTU_CODENAME=$(lsb_release -cs)
     echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com ${UBUNTU_CODENAME} main" | sudo tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
     
