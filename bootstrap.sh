@@ -78,7 +78,7 @@ log "5. Verificando K3s..."
 if ! command -v k3s &> /dev/null; then
     log "Instalando K3s..."
     # Instalación de K3s con permisos de lectura del kubeconfig para el usuario
-    curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
+    curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644 --disable=traefik
     
     # Configurar KUBECONFIG para el usuario actual
     mkdir -p "$HOME/.kube"

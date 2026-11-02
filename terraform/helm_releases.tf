@@ -45,7 +45,7 @@ resource "helm_release" "ingress_nginx" {
 
   set {
     name  = "controller.service.type"
-    value = "NodePort"
+    value = "LoadBalancer"
   }
 
   # Forzamos a que Nginx procese EXCLUSIVAMENTE los Ingress que tengan ingressClassName: nginx
