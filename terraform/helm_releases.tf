@@ -35,7 +35,7 @@ resource "helm_release" "kube_prometheus_stack" {
   }
 }
 
-# 3. Despliegue del Nginx Ingress Controller en el namespace infra-core (o uno dedicado como ingress-nginx)
+# 3. Despliegue del Nginx Ingress Controller en el namespace infra-core
 resource "helm_release" "ingress_nginx" {
   name             = "ingress-nginx"
   repository       = "https://kubernetes.github.io/ingress-nginx"
@@ -48,11 +48,7 @@ resource "helm_release" "ingress_nginx" {
     value = "NodePort"
   }
 
-  set {
-    name  = "controller.scope.enabled"
-    value = "true"
-  }
-
+  # Forzamos a que Nginx procese EXCLUSIVAMENTE los Ingress que tengan ingressClassName: nginx
   set {
     name  = "controller.ingressClassResource.name"
     value = "nginx"
@@ -66,5 +62,11 @@ resource "helm_release" "ingress_nginx" {
   set {
     name  = "controller.ingressClassResource.controllerValue"
     value = "k8s.io/ingress-nginx"
+  }
+
+  # Indicamos explícitamente qué namespaces debe vigilar para evitar ruidos de Traefik
+  set {
+    name  = "controller.watchNamespace"
+    value = "observability,infra-core"
   }
 }
