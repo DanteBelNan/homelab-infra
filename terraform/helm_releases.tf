@@ -70,3 +70,71 @@ resource "helm_release" "ingress_nginx" {
     value = ["observability", "infra-core"]
   }
 }
+
+# 4. Despliegue de Grafana Loki para centralización de logs
+resource "helm_release" "loki" {
+  name             = "loki"
+  repository       = "https://grafana.github.io/helm-charts"
+  chart            = "loki-stack"
+  namespace        = "observability"
+  create_namespace = false
+
+  set {
+    name  = "loki.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "promtail.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "promtail.config.snippets.extraRelabelConfigs"
+    value = <<-EOT
+      - action: replace
+        source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        target_label: service_name
+    EOT
+  }
+}
+
+# 5. Despliegue del OpenTelemetry Collector para métricas y trazas de aplicaciones
+resource "helm_release" "otel_collector" {
+  name             = "otel-collector"
+  repository       = "https://open-telemetry.github.io/opentelemetry-helm-charts"
+  chart            = "opentelemetry-collector"
+  namespace        = "observability"
+  create_namespace = false
+
+  set {
+    name  = "mode"
+    value = "deployment"
+  }
+
+  set {
+    name  = "config.receivers.otlp.protocols.grpc.endpoint"
+    value = "0.0.0.0:4317"
+  }
+
+  set {
+    name  = "config.receivers.otlp.protocols.http.endpoint"
+    value = "0.0.0.0:4318"
+  }
+
+  # Exportador hacia el Prometheus del clúster
+  set {
+    name  = "config.exporters.prometheus.endpoint"
+    value = "0.0.0.0:8889"
+  }
+
+  set {
+    name  = "config.service.pipelines.metrics.receivers[0]"
+    value = "otlp"
+  }
+
+  set {
+    name  = "config.service.pipelines.metrics.exporters[0]"
+    value = "prometheus"
+  }
+}
