@@ -65,8 +65,8 @@ resource "helm_release" "ingress_nginx" {
   }
 
   # Indicamos explícitamente qué namespaces debe vigilar para evitar ruidos de Traefik
-  set {
-    name  = "controller.watchNamespace"
-    value = "{observability,infra-core}"
+  set_list {
+    name  = "controller.watchNamespaces"
+    value = ["observability", "infra-core"]
   }
 }

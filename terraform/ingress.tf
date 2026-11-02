@@ -1,4 +1,6 @@
 resource "kubernetes_ingress_v1" "grafana_ingress" {
+  depends_on = [helm_release.ingress_nginx]
+
   metadata {
     name      = "grafana-ingress"
     namespace = "observability"
