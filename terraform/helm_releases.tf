@@ -88,17 +88,7 @@ resource "helm_release" "loki" {
     name  = "promtail.enabled"
     value = "true"
   }
-
-  set {
-    name  = "promtail.config.snippets.extraRelabelConfigs"
-    value = <<-EOT
-      - action: replace
-        source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
-        target_label: service_name
-    EOT
-  }
 }
-
 # 5. Despliegue del OpenTelemetry Collector para métricas y trazas de aplicaciones
 resource "helm_release" "otel_collector" {
   name             = "otel-collector"
