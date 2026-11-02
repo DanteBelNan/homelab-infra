@@ -48,9 +48,19 @@ resource "helm_release" "ingress_nginx" {
     value = "NodePort"
   }
 
-  # Esto le permite al controlador leer Ingresses creados en CUALQUIER namespace (ej. observability)
   set {
     name  = "controller.scope.enabled"
     value = "true"
+  }
+
+  # Forzamos que el controlador gestione la clase "nginx"
+  set {
+    name  = "controller.ingressClassResource.name"
+    value = "nginx"
+  }
+
+  set {
+    name  = "controller.ingressClass"
+    value = "nginx"
   }
 }
