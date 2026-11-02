@@ -24,15 +24,28 @@ resource "helm_release" "kube_prometheus_stack" {
   namespace        = "observability"
   create_namespace = false
 
-  set {
-    name  = "grafana.enabled"
-    value = "true"
-  }
+  values = [<<-EOT
+    grafana:
+      enabled: true
+      additionalDataSources:
+        - name: Loki
+          type: loki
+          url: http://loki:3100
+          access: proxy
+          isDefault: false
+        - name: Tempo
+          type: tempo
+          url: http://tempo:3100
+          access: proxy
+          isDefault: false
 
-  set {
-    name  = "prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues"
-    value = "false"
-  }
+    prometheus:
+      prometheusSpec:
+        serviceMonitorSelectorNilUsesHelmValues: false
+        # Habilitar remote write para recibir métricas del OTEL Collector
+        enableRemoteWriteReceiver: true
+  EOT
+  ]
 }
 
 # 3. Despliegue del Nginx Ingress Controller en el namespace infra-core
@@ -58,7 +71,7 @@ resource "helm_release" "ingress_nginx" {
     name  = "controller.ingressClass"
     value = "nginx"
   }
-  
+
   set {
     name  = "controller.ingressClassResource.controllerValue"
     value = "k8s.io/ingress-nginx"
@@ -71,66 +84,148 @@ resource "helm_release" "ingress_nginx" {
   }
 }
 
-# 4. Despliegue de Grafana Loki para centralización de logs
+# 4. Despliegue de Grafana Loki (SingleBinary — reemplaza loki-stack deprecado)
 resource "helm_release" "loki" {
   name             = "loki"
   repository       = "https://grafana.github.io/helm-charts"
-  chart            = "loki-stack"
+  chart            = "loki"
   namespace        = "observability"
   create_namespace = false
 
-  set {
-    name  = "loki.enabled"
-    value = "true"
-  }
+  values = [<<-EOT
+    deploymentMode: SingleBinary
+
+    loki:
+      commonConfig:
+        replication_factor: 1
+      storage:
+        type: filesystem
+      schemaConfig:
+        configs:
+          - from: "2024-01-01"
+            store: tsdb
+            object_store: filesystem
+            schema: v13
+            index:
+              prefix: loki_index_
+              period: 24h
+      auth_enabled: false
+
+    singleBinary:
+      replicas: 1
+
+    # Desactivar componentes distribuidos (no necesarios en single-node)
+    read:
+      replicas: 0
+    write:
+      replicas: 0
+    backend:
+      replicas: 0
+  EOT
+  ]
+}
+
+# 5. Despliegue de Promtail para scraping automático de logs de pods
+resource "helm_release" "promtail" {
+  name             = "promtail"
+  repository       = "https://grafana.github.io/helm-charts"
+  chart            = "promtail"
+  namespace        = "observability"
+  create_namespace = false
+  depends_on       = [helm_release.loki]
 
   set {
-    name  = "promtail.enabled"
-    value = "true"
+    name  = "config.clients[0].url"
+    value = "http://loki:3100/loki/api/v1/push"
   }
 }
-# 5. Despliegue del OpenTelemetry Collector para métricas y trazas de aplicaciones
+
+# 6. Despliegue de Grafana Tempo para trazas distribuidas
+# Disponible para cuando las apps comiencen a instrumentar trazas (OTLP → Tempo)
+resource "helm_release" "tempo" {
+  name             = "tempo"
+  repository       = "https://grafana.github.io/helm-charts"
+  chart            = "tempo"
+  namespace        = "observability"
+  create_namespace = false
+  depends_on       = [helm_release.kube_prometheus_stack]
+
+  values = [<<-EOT
+    tempo:
+      storage:
+        trace:
+          backend: local
+          local:
+            path: /var/tempo/traces
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: "0.0.0.0:4317"
+            http:
+              endpoint: "0.0.0.0:4318"
+  EOT
+  ]
+}
+
+# 7. Despliegue del OpenTelemetry Collector
+# Recibe métricas y logs de apps instrumentadas (OTLP) y los enruta a Prometheus y Loki
+# Recibe trazas y las enruta a Tempo
 resource "helm_release" "otel_collector" {
   name             = "otel-collector"
   repository       = "https://open-telemetry.github.io/opentelemetry-helm-charts"
   chart            = "opentelemetry-collector"
   namespace        = "observability"
   create_namespace = false
+  depends_on       = [helm_release.loki, helm_release.tempo, helm_release.kube_prometheus_stack]
 
-  set {
-    name  = "mode"
-    value = "deployment"
-  }
+  values = [<<-EOT
+    mode: deployment
 
-  # Requerido por el chart en versiones recientes
-  set {
-    name  = "image.repository"
-    value = "otel/opentelemetry-collector-contrib"
-  }
+    image:
+      repository: otel/opentelemetry-collector-contrib
 
-  set {
-    name  = "config.receivers.otlp.protocols.grpc.endpoint"
-    value = "0.0.0.0:4317"
-  }
+    config:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: "0.0.0.0:4317"
+            http:
+              endpoint: "0.0.0.0:4318"
 
-  set {
-    name  = "config.receivers.otlp.protocols.http.endpoint"
-    value = "0.0.0.0:4318"
-  }
+      processors:
+        batch: {}
+        memory_limiter:
+          check_interval: 1s
+          limit_mib: 256
 
-  # Exportador hacia el Prometheus del clúster
-  set {
-    name  = "config.exporters.prometheus.endpoint"
-    value = "0.0.0.0:8889"
-  }
+      exporters:
+        prometheusremotewrite:
+          endpoint: "http://monitoring-kube-prometheus-prometheus:9090/api/v1/write"
+          tls:
+            insecure: true
+        loki:
+          endpoint: "http://loki:3100/loki/api/v1/push"
+        otlp/tempo:
+          endpoint: "http://tempo:4317"
+          tls:
+            insecure: true
 
-  set {
-    name  = "config.service.pipelines.metrics.receivers[0]"
-    value = "otlp"
-  }
-
-  set {
-    name  = "config.service.pipelines.metrics.exporters[0]"
-    value = "prometheus"
-  }
+      service:
+        pipelines:
+          metrics:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [prometheusremotewrite]
+          logs:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [loki]
+          traces:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [otlp/tempo]
+  EOT
+  ]
 }
