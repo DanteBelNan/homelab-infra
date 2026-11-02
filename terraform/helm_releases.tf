@@ -177,6 +177,7 @@ resource "helm_release" "otel_collector" {
   chart            = "opentelemetry-collector"
   namespace        = "observability"
   create_namespace = false
+  timeout          = 600
   depends_on       = [helm_release.loki, helm_release.tempo, helm_release.kube_prometheus_stack]
 
   values = [<<-EOT
@@ -205,8 +206,11 @@ resource "helm_release" "otel_collector" {
           endpoint: "http://monitoring-kube-prometheus-prometheus:9090/api/v1/write"
           tls:
             insecure: true
-        loki:
-          endpoint: "http://loki:3100/loki/api/v1/push"
+        # Loki soporta OTLP nativo desde v2.9 — el exporter "loki" fue removido de contrib
+        otlphttp/loki:
+          endpoint: "http://loki:3100/otlp"
+          tls:
+            insecure: true
         otlp/tempo:
           endpoint: "http://tempo:4317"
           tls:
@@ -221,7 +225,7 @@ resource "helm_release" "otel_collector" {
           logs:
             receivers: [otlp]
             processors: [memory_limiter, batch]
-            exporters: [loki]
+            exporters: [otlphttp/loki]
           traces:
             receivers: [otlp]
             processors: [memory_limiter, batch]
