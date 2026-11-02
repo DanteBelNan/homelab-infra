@@ -53,7 +53,6 @@ resource "helm_release" "ingress_nginx" {
     value = "true"
   }
 
-  # Forzamos que el controlador gestione la clase "nginx"
   set {
     name  = "controller.ingressClassResource.name"
     value = "nginx"
@@ -62,5 +61,10 @@ resource "helm_release" "ingress_nginx" {
   set {
     name  = "controller.ingressClass"
     value = "nginx"
+  }
+  
+  set {
+    name  = "controller.ingressClassResource.controllerValue"
+    value = "k8s.io/ingress-nginx"
   }
 }
