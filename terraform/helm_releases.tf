@@ -112,6 +112,12 @@ resource "helm_release" "otel_collector" {
     value = "deployment"
   }
 
+  # Requerido por el chart en versiones recientes
+  set {
+    name  = "image.repository"
+    value = "otel/opentelemetry-collector-contrib"
+  }
+
   set {
     name  = "config.receivers.otlp.protocols.grpc.endpoint"
     value = "0.0.0.0:4317"
